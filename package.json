@@ -1,0 +1,37 @@
+{
+  "name": "schedule-generator",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "build": "turbo build",
+    "dev": "turbo dev",
+    "lint": "turbo lint",
+    "format": "turbo format",
+    "typecheck": "turbo typecheck"
+  },
+  "devDependencies": {
+    "@types/file-saver": "^2.0.7",
+    "@workspace/eslint-config": "*",
+    "@workspace/typescript-config": "*",
+    "prettier": "^3.8.1",
+    "prettier-plugin-tailwindcss": "^0.7.2",
+    "turbo": "^2.8.17",
+    "typescript": "5.9.3"
+  },
+  "packageManager": "npm@11.12.1",
+  "engines": {
+    "node": ">=20"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "dependencies": {
+    "dayjs": "^1.11.20",
+    "exceljs": "^4.4.0",
+    "file-saver": "^2.0.5",
+    "lucide-react": "^1.14.0",
+    "xlsx": "^0.18.5",
+    "zustand": "^5.0.12"
+  }
+}

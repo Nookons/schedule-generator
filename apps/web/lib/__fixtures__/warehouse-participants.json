@@ -1,0 +1,464 @@
+{
+  "warehouse": "GLP-C",
+  "month": "2026-09",
+  "rows": [
+    {
+      "subject": "e123",
+      "kind": "employee",
+      "id": 123,
+      "user_name": "Участник 1",
+      "warehouse": "GLP-C",
+      "card_id": null,
+      "role": "shift leader",
+      "is_leader": false,
+      "is_active": true,
+      "avatar_url": null,
+      "prefs": {
+        "shift_preference": "all",
+        "min_shifts_per_month": 0,
+        "max_shifts_per_month": 31,
+        "priority": 1,
+        "days_off": [],
+        "note": null,
+        "has_month_override": false
+      },
+      "marks": [],
+      "external_shifts": [
+        {
+          "day": 2,
+          "shift_type": "day",
+          "warehouse": "SMALL-P3"
+        },
+        {
+          "day": 3,
+          "shift_type": "day",
+          "warehouse": "SMALL-P3"
+        },
+        {
+          "day": 4,
+          "shift_type": "day",
+          "warehouse": "SMALL-P3"
+        },
+        {
+          "day": 5,
+          "shift_type": "day",
+          "warehouse": "SMALL-P3"
+        },
+        {
+          "day": 6,
+          "shift_type": "day",
+          "warehouse": "SMALL-P3"
+        },
+        {
+          "day": 10,
+          "shift_type": "night",
+          "warehouse": "SMALL-P3"
+        },
+        {
+          "day": 11,
+          "shift_type": "night",
+          "warehouse": "SMALL-P3"
+        },
+        {
+          "day": 12,
+          "shift_type": "night",
+          "warehouse": "SMALL-P3"
+        },
+        {
+          "day": 13,
+          "shift_type": "night",
+          "warehouse": "SMALL-P3"
+        },
+        {
+          "day": 14,
+          "shift_type": "night",
+          "warehouse": "SMALL-P3"
+        },
+        {
+          "day": 17,
+          "shift_type": "day",
+          "warehouse": "SMALL-P3"
+        },
+        {
+          "day": 18,
+          "shift_type": "day",
+          "warehouse": "SMALL-P3"
+        },
+        {
+          "day": 19,
+          "shift_type": "day",
+          "warehouse": "SMALL-P3"
+        },
+        {
+          "day": 20,
+          "shift_type": "day",
+          "warehouse": "SMALL-P3"
+        },
+        {
+          "day": 21,
+          "shift_type": "day",
+          "warehouse": "SMALL-P3"
+        },
+        {
+          "day": 25,
+          "shift_type": "night",
+          "warehouse": "SMALL-P3"
+        },
+        {
+          "day": 26,
+          "shift_type": "night",
+          "warehouse": "SMALL-P3"
+        },
+        {
+          "day": 27,
+          "shift_type": "night",
+          "warehouse": "SMALL-P3"
+        },
+        {
+          "day": 28,
+          "shift_type": "night",
+          "warehouse": "SMALL-P3"
+        },
+        {
+          "day": 29,
+          "shift_type": "night",
+          "warehouse": "SMALL-P3"
+        }
+      ]
+    },
+    {
+      "subject": "e51",
+      "kind": "employee",
+      "id": 51,
+      "user_name": "Участник 2",
+      "warehouse": "GLP-C",
+      "card_id": null,
+      "role": "shift leader",
+      "is_leader": false,
+      "is_active": true,
+      "avatar_url": null,
+      "prefs": {
+        "shift_preference": "all",
+        "min_shifts_per_month": 0,
+        "max_shifts_per_month": 31,
+        "priority": 1,
+        "days_off": [],
+        "note": null,
+        "has_month_override": false
+      },
+      "marks": [],
+      "external_shifts": []
+    },
+    {
+      "subject": "e39",
+      "kind": "employee",
+      "id": 39,
+      "user_name": "Участник 3",
+      "warehouse": "GLP-C",
+      "card_id": null,
+      "role": "admin",
+      "is_leader": true,
+      "is_active": true,
+      "avatar_url": null,
+      "prefs": {
+        "shift_preference": "only_day",
+        "min_shifts_per_month": 0,
+        "max_shifts_per_month": 31,
+        "priority": 1,
+        "days_off": [],
+        "note": null,
+        "has_month_override": false
+      },
+      "marks": [],
+      "external_shifts": []
+    },
+    {
+      "subject": "e133",
+      "kind": "employee",
+      "id": 133,
+      "user_name": "Участник 4",
+      "warehouse": "GLP-C",
+      "card_id": null,
+      "role": "worker",
+      "is_leader": false,
+      "is_active": true,
+      "avatar_url": null,
+      "prefs": {
+        "shift_preference": "all",
+        "min_shifts_per_month": 0,
+        "max_shifts_per_month": 31,
+        "priority": 1,
+        "days_off": [],
+        "note": null,
+        "has_month_override": false
+      },
+      "marks": [],
+      "external_shifts": [
+        {
+          "day": 1,
+          "shift_type": "day",
+          "warehouse": "SMALL-P3"
+        },
+        {
+          "day": 5,
+          "shift_type": "night",
+          "warehouse": "SMALL-P3"
+        },
+        {
+          "day": 6,
+          "shift_type": "night",
+          "warehouse": "SMALL-P3"
+        },
+        {
+          "day": 7,
+          "shift_type": "night",
+          "warehouse": "SMALL-P3"
+        },
+        {
+          "day": 8,
+          "shift_type": "night",
+          "warehouse": "SMALL-P3"
+        },
+        {
+          "day": 9,
+          "shift_type": "night",
+          "warehouse": "SMALL-P3"
+        },
+        {
+          "day": 12,
+          "shift_type": "day",
+          "warehouse": "SMALL-P3"
+        },
+        {
+          "day": 13,
+          "shift_type": "day",
+          "warehouse": "SMALL-P3"
+        },
+        {
+          "day": 14,
+          "shift_type": "day",
+          "warehouse": "SMALL-P3"
+        },
+        {
+          "day": 15,
+          "shift_type": "day",
+          "warehouse": "SMALL-P3"
+        },
+        {
+          "day": 16,
+          "shift_type": "day",
+          "warehouse": "SMALL-P3"
+        },
+        {
+          "day": 20,
+          "shift_type": "night",
+          "warehouse": "SMALL-P3"
+        },
+        {
+          "day": 21,
+          "shift_type": "night",
+          "warehouse": "SMALL-P3"
+        },
+        {
+          "day": 22,
+          "shift_type": "night",
+          "warehouse": "SMALL-P3"
+        },
+        {
+          "day": 23,
+          "shift_type": "night",
+          "warehouse": "SMALL-P3"
+        },
+        {
+          "day": 24,
+          "shift_type": "night",
+          "warehouse": "SMALL-P3"
+        },
+        {
+          "day": 27,
+          "shift_type": "day",
+          "warehouse": "SMALL-P3"
+        },
+        {
+          "day": 28,
+          "shift_type": "day",
+          "warehouse": "SMALL-P3"
+        },
+        {
+          "day": 29,
+          "shift_type": "day",
+          "warehouse": "SMALL-P3"
+        },
+        {
+          "day": 30,
+          "shift_type": "day",
+          "warehouse": "SMALL-P3"
+        }
+      ]
+    },
+    {
+      "subject": "e161",
+      "kind": "employee",
+      "id": 161,
+      "user_name": "Участник 5",
+      "warehouse": "PNT-A",
+      "card_id": null,
+      "role": "worker",
+      "is_leader": false,
+      "is_active": true,
+      "avatar_url": null,
+      "prefs": {
+        "shift_preference": "all",
+        "min_shifts_per_month": 0,
+        "max_shifts_per_month": 31,
+        "priority": 1,
+        "days_off": [],
+        "note": null,
+        "has_month_override": false
+      },
+      "marks": [],
+      "external_shifts": []
+    },
+    {
+      "subject": "e42",
+      "kind": "employee",
+      "id": 42,
+      "user_name": "Участник 6",
+      "warehouse": "GLP-C",
+      "card_id": null,
+      "role": "worker",
+      "is_leader": false,
+      "is_active": true,
+      "avatar_url": null,
+      "prefs": {
+        "shift_preference": "only_day",
+        "min_shifts_per_month": 0,
+        "max_shifts_per_month": 31,
+        "priority": 1,
+        "days_off": [
+          1,
+          2,
+          3,
+          4,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          14,
+          15,
+          16,
+          17,
+          18,
+          21,
+          22,
+          23,
+          24,
+          25,
+          27,
+          28,
+          29,
+          30
+        ],
+        "note": null,
+        "has_month_override": false
+      },
+      "marks": [],
+      "external_shifts": []
+    },
+    {
+      "subject": "e135",
+      "kind": "employee",
+      "id": 135,
+      "user_name": "Участник 7",
+      "warehouse": "GLP-C",
+      "card_id": null,
+      "role": "worker",
+      "is_leader": false,
+      "is_active": true,
+      "avatar_url": null,
+      "prefs": {
+        "shift_preference": "all",
+        "min_shifts_per_month": 0,
+        "max_shifts_per_month": 31,
+        "priority": 1,
+        "days_off": [],
+        "note": null,
+        "has_month_override": false
+      },
+      "marks": [],
+      "external_shifts": []
+    },
+    {
+      "subject": "e110",
+      "kind": "employee",
+      "id": 110,
+      "user_name": "Участник 8",
+      "warehouse": "GLP-C",
+      "card_id": null,
+      "role": "shift leader",
+      "is_leader": false,
+      "is_active": true,
+      "avatar_url": null,
+      "prefs": {
+        "shift_preference": "all",
+        "min_shifts_per_month": 0,
+        "max_shifts_per_month": 31,
+        "priority": 1,
+        "days_off": [],
+        "note": null,
+        "has_month_override": false
+      },
+      "marks": [],
+      "external_shifts": []
+    },
+    {
+      "subject": "e149",
+      "kind": "employee",
+      "id": 149,
+      "user_name": "Участник 9",
+      "warehouse": "GLP-C",
+      "card_id": null,
+      "role": "worker",
+      "is_leader": false,
+      "is_active": true,
+      "avatar_url": null,
+      "prefs": {
+        "shift_preference": "all",
+        "min_shifts_per_month": 0,
+        "max_shifts_per_month": 31,
+        "priority": 1,
+        "days_off": [],
+        "note": null,
+        "has_month_override": false
+      },
+      "marks": [],
+      "external_shifts": []
+    },
+    {
+      "subject": "e56",
+      "kind": "employee",
+      "id": 56,
+      "user_name": "Участник 10",
+      "warehouse": "GLP-C",
+      "card_id": null,
+      "role": "worker",
+      "is_leader": false,
+      "is_active": true,
+      "avatar_url": null,
+      "prefs": {
+        "shift_preference": "all",
+        "min_shifts_per_month": 0,
+        "max_shifts_per_month": 31,
+        "priority": 1,
+        "days_off": [],
+        "note": null,
+        "has_month_override": false
+      },
+      "marks": [],
+      "external_shifts": []
+    }
+  ],
+  "note": "Снимок состава склада GLP-C за 2026-09 вместе со сменами на других складах. Имена обезличены; структура и данные графика настоящие."
+}

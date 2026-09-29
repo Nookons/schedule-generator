@@ -1,26 +1,37 @@
-import AddUserWrapper from "@/components/AddUserWrapper"
-import UsersList from "@/components/UsersList"
-import MonthPicker from "@/components/MonthPicker"
-import ShiftsSettings from "@/components/ShiftsSettings"
-import ExportsButtonWrapper from "@/components/ExportsButtonWrapper"
+"use client"
 
+import { useEffect } from "react"
+
+import LoginScreen from "@/components/LoginScreen"
+import ScheduleScreen from "@/components/ScheduleScreen"
+import { useAuthStore } from "@/store/useAuthStore"
+
+/**
+ * Точка входа.
+ *
+ * Экран один, поэтому вместо отдельного маршрута `/login` форма входа
+ * показывается на месте, пока сессии нет. `initialize` восстанавливает сессию
+ * из хранилища браузера и подписывается на её изменения.
+ */
 export default function Page() {
-  return (
-    <div className="flex min-h-svh flex-col gap-2 p-6">
-      <div className="fixed top-0 left-0 p-2 font-mono text-xs text-muted-foreground backdrop-blur-xl">
-        (Press <kbd>d</kbd> to toggle dark mode)
+  const status = useAuthStore((state) => state.status)
+  const initialize = useAuthStore((state) => state.initialize)
+
+  useEffect(() => {
+    void initialize()
+  }, [initialize])
+
+  if (status === "loading") {
+    return (
+      <div className="flex min-h-svh items-center justify-center">
+        <p className="text-sm text-muted-foreground">Загрузка…</p>
       </div>
-      <div className={`mt-4 grid w-full grid-cols-4 items-center gap-4`}>
-        <div className={`col-span-3 flex w-full items-end justify-start gap-2`}>
-          <MonthPicker />
-          <ShiftsSettings />
-        </div>
-        <div className={`flex items-center gap-2`}>
-          <AddUserWrapper isPreview={false} />
-        </div>
-      </div>
-      <UsersList />
-      <ExportsButtonWrapper />
-    </div>
-  )
+    )
+  }
+
+  if (status === "signed-out") {
+    return <LoginScreen />
+  }
+
+  return <ScheduleScreen />
 }

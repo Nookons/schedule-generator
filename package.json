@@ -27,6 +27,8 @@
     "packages/*"
   ],
   "dependencies": {
+    "@supabase/ssr": "^0.10.3",
+    "@supabase/supabase-js": "^2.105.4",
     "dayjs": "^1.11.20",
     "exceljs": "^4.4.0",
     "file-saver": "^2.0.5",

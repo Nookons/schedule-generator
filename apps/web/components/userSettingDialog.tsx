@@ -1,5 +1,7 @@
 "use client"
-import React, { useState } from "react"
+
+import { useState } from "react"
+import { toast } from "sonner"
 import {
   Dialog,
   DialogClose,
@@ -14,14 +16,6 @@ import { Button } from "@workspace/ui/components/button"
 import { Field, FieldGroup, FieldLabel } from "@workspace/ui/components/field"
 import { Label } from "@workspace/ui/components/label"
 import { Input } from "@workspace/ui/components/input"
-import { Settings, UserPen } from "lucide-react"
-import { IUser } from "@/types/User"
-import {
-  ContractType,
-  ShiftPreference,
-  useUsersStore,
-} from "@/store/useUsersStore"
-import dayjs from "dayjs"
 import {
   Select,
   SelectContent,
@@ -29,263 +23,384 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@workspace/ui/components/select"
+import { UserPen } from "lucide-react"
+import dayjs from "dayjs"
 
-const COLORS = [
-  "#4f46e5",
-  "#e11d48",
-  "#16a34a",
-  "#d97706",
-  "#0891b2",
-  "#7c3aed",
-  "#db2777",
-  "#65a30d",
+import { ApiError } from "@/lib/api/client"
+import type { EmployeePrefsUpdate, ShiftPreference } from "@/lib/api/types"
+import { normalizePreference } from "@/lib/employeeMapping"
+import { ScheduleApi } from "@/services/ScheduleApi"
+import { useSettingStore } from "@/store/useSettingStore"
+import { useUsersStore } from "@/store/useUsersStore"
+import type { IUser } from "@/types/User"
+
+/**
+ * Настройки предпочтений работника.
+ *
+ * Данные хранятся на двух уровнях: постоянные («база») и переопределение на
+ * конкретный месяц. Интерфейс не скрывает это разделение, потому что от него
+ * зависит результат: то, что менеджер правит в сентябре, не обязано
+ * действовать в октябре.
+ *
+ * Сохранение идёт на сервер сразу — локальной копии настроек нет, иначе она
+ * разошлась бы с базой при работе в двух вкладках.
+ */
+
+type Scope = "base" | "month"
+
+const SHIFT_PREFERENCES: { value: ShiftPreference; label: string }[] = [
+  { value: "all", label: "Любые смены" },
+  { value: "day", label: "День (предпочтительно)" },
+  { value: "night", label: "Ночь (предпочтительно)" },
+  { value: "only_day", label: "Только день" },
+  { value: "only_night", label: "Только ночь" },
 ]
 
-const UserSettingDialog = ({ user }: { user: IUser }) => {
-  const { updateUser, removeUser } = useUsersStore()
-  const daysInMonth = dayjs().daysInMonth()
+interface FormState {
+  shiftPreference: ShiftPreference
+  priority: number
+  minShiftsPerMonth: number
+  maxShiftsPerMonth: number
+  daysOff: number[]
+  note: string
+}
 
-  const [form, setForm] = useState<Omit<IUser, "id">>({
-    fullName: user.fullName,
-    position: user.position,
-    color: user.color,
-    priority: user.priority,
+function formFromUser(user: IUser): FormState {
+  return {
     shiftPreference: user.shiftPreference,
-    daysOffUsers: user.daysOffUsers,
-    daysOff: user.daysOff,
-    dayShifts: user.dayShifts,
-    nightShifts: user.nightShifts,
+    priority: user.priority,
     minShiftsPerMonth: user.minShiftsPerMonth,
     maxShiftsPerMonth: user.maxShiftsPerMonth,
-    contractType: user.contractType,
-    isActive: user.isActive,
-    notes: user.notes,
-  })
+    daysOff: [...user.daysOffUsers].sort((a, b) => a - b),
+    note: user.note ?? "",
+  }
+}
 
-  const handleSave = () => {
-    updateUser(user.id, form)
+const UserSettingDialog = ({ user }: { user: IUser }) => {
+  const month = useSettingStore((state) => state.currentMonth)
+  const daysInMonth = dayjs(month).daysInMonth()
+
+  const [isOpen, setIsOpen] = useState(false)
+  const [scope, setScope] = useState<Scope>("base")
+  const [form, setForm] = useState<FormState>(() => formFromUser(user))
+  const [isSaving, setIsSaving] = useState(false)
+
+  const handleOpenChange = (open: boolean) => {
+    setIsOpen(open)
+    // Открытие всегда начинается с текущих данных: диалог мог остаться
+    // с несохранёнными правками от прошлого раза.
+    if (open) setForm(formFromUser(user))
   }
 
-  const handleRemove = () => {
-    removeUser(user.id)
-  }
-
-  const toggleDay = (
-    day: number,
-    field: "daysOff" | "daysOffUsers"
-  ) => {
+  const toggleDay = (day: number) => {
     setForm((prev) => ({
       ...prev,
-      [field]: prev[field].includes(day)
-        ? prev[field].filter((d) => d !== day)
-        : [...prev[field], day],
+      daysOff: prev.daysOff.includes(day)
+        ? prev.daysOff.filter((value) => value !== day)
+        : [...prev.daysOff, day].sort((a, b) => a - b),
     }))
   }
 
-  const DaySelector = ({
-    field,
-    label,
-  }: {
-    field: "daysOff" | "daysOffUsers"
-    label: string
-  }) => (
-    <Field>
-      <FieldLabel>{label}</FieldLabel>
-      <div className="mt-1 flex flex-wrap gap-1">
-        {Array.from({ length: daysInMonth }).map((_, i) => {
-          const day = i + 1
-          const selected = form[field].includes(day)
+  const handleSave = async () => {
+    if (form.maxShiftsPerMonth < form.minShiftsPerMonth) {
+      toast.error("Максимум смен не может быть меньше минимума")
+      return
+    }
 
-          return (
-            <button
-              key={day}
-              type="button"
-              onClick={() => toggleDay(day, field)}
-              className={`h-7 w-7 rounded border text-xs transition-colors ${
-                selected
-                  ? "border-primary bg-primary text-primary-foreground"
-                  : "border-border bg-background hover:bg-muted"
-              }`}
-            >
-              {day}
-            </button>
-          )
-        })}
-      </div>
-    </Field>
-  )
+    const payload: EmployeePrefsUpdate = {
+      shift_preference: form.shiftPreference,
+      priority: form.priority,
+      min_shifts_per_month: form.minShiftsPerMonth,
+      max_shifts_per_month: form.maxShiftsPerMonth,
+      days_off: form.daysOff,
+      note: form.note.trim() || null,
+    }
+    // Поле month в теле выбирает, куда писать: null — база, строка — месяц.
+    if (scope === "month") payload.month = month
+
+    setIsSaving(true)
+    try {
+      const bundle = await ScheduleApi.savePrefs(user.id, payload, month)
+      applyBundle(bundle.effective, bundle.month_override !== null)
+      toast.success(
+        scope === "base"
+          ? "Базовые настройки сохранены"
+          : `Настройки на ${month} сохранены`
+      )
+      setIsOpen(false)
+    } catch (cause) {
+      toast.error(
+        cause instanceof ApiError ? cause.message : "Не удалось сохранить"
+      )
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const handleResetMonth = async () => {
+    setIsSaving(true)
+    try {
+      const bundle = await ScheduleApi.deleteMonthOverride(user.id, month)
+      applyBundle(bundle.effective, false)
+      toast.success(`Переопределение на ${month} снято`)
+      setIsOpen(false)
+    } catch (cause) {
+      toast.error(
+        cause instanceof ApiError ? cause.message : "Не удалось сбросить"
+      )
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  /**
+   * Сброс постоянных настроек к значениям по умолчанию.
+   *
+   * Переопределение на месяц при этом сохраняется — это отдельные данные,
+   * и стирать договорённость по конкретному месяцу заодно с «обычным режимом»
+   * было бы неожиданно.
+   */
+  const handleResetBase = async () => {
+    setIsSaving(true)
+    try {
+      const bundle = await ScheduleApi.deleteBasePrefs(user.id, month)
+      applyBundle(bundle.effective, bundle.month_override !== null)
+      // Диалог остаётся открытым: сброс — это не сохранение, и менеджеру
+      // полезно увидеть, к чему вернулись значения, прежде чем закрывать.
+      setForm({
+        shiftPreference: bundle.effective.shift_preference,
+        priority: bundle.effective.priority,
+        minShiftsPerMonth: bundle.effective.min_shifts_per_month,
+        maxShiftsPerMonth: bundle.effective.max_shifts_per_month,
+        daysOff: [...bundle.effective.days_off].sort((a, b) => a - b),
+        note: bundle.effective.note ?? "",
+      })
+      toast.success("Постоянные настройки сброшены к значениям по умолчанию")
+    } catch (cause) {
+      toast.error(
+        cause instanceof ApiError ? cause.message : "Не удалось сбросить"
+      )
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  /** Переносит ответ сервера в стор — без повторной загрузки всего склада. */
+  const applyBundle = (
+    effective: {
+      shift_preference: ShiftPreference
+      priority: number
+      min_shifts_per_month: number
+      max_shifts_per_month: number
+      days_off: number[]
+      note: string | null
+    },
+    hasOverride: boolean
+  ) => {
+    useUsersStore.getState().updateUser(user.subject, {
+      // Через нормализатор, а не как есть: значение пришло из сети, а
+      // генератор вызывает у него `toLowerCase()`.
+      shiftPreference: normalizePreference(effective.shift_preference),
+      priority: effective.priority,
+      minShiftsPerMonth: effective.min_shifts_per_month,
+      maxShiftsPerMonth: effective.max_shifts_per_month,
+      daysOffUsers: [...effective.days_off].sort((a, b) => a - b),
+      note: effective.note,
+      hasMonthOverride: hasOverride,
+    })
+  }
 
   return (
-    <Dialog>
+    <Dialog open={isOpen} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
-        <Button variant="ghost" size="icon">
+        <Button variant="ghost" size="icon" aria-label={`Настройки ${user.fullName}`}>
           <UserPen className="h-4 w-4" />
         </Button>
       </DialogTrigger>
 
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Employee Settings</DialogTitle>
-          <DialogDescription>
-            Edit employee details and schedule preferences.
+          <DialogTitle>{user.fullName}</DialogTitle>
+          <DialogDescription className="flex items-center gap-2">
+            Предпочтения работника
+            {user.hasMonthOverride && (
+              <span className="rounded bg-muted px-2 py-0.5 text-xs font-medium">
+                на {month} переопределены
+              </span>
+            )}
           </DialogDescription>
         </DialogHeader>
 
         <FieldGroup>
-          {/* Basic Info */}
           <Field>
-            <Label htmlFor="fullName">Full Name</Label>
-            <Input
-              id="fullName"
-              value={form.fullName}
-              onChange={(e) => setForm({ ...form, fullName: e.target.value })}
-            />
+            <FieldLabel>Куда сохранять</FieldLabel>
+            <Select
+              value={scope}
+              onValueChange={(value) => setScope(value as Scope)}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="base">
+                  Постоянные настройки (по умолчанию)
+                </SelectItem>
+                <SelectItem value="month">Только на {month}</SelectItem>
+              </SelectContent>
+            </Select>
           </Field>
 
-          {/*<Field>
-            <Label htmlFor="position">Position</Label>
-            <Input
-              id="position"
-              placeholder="e.g. Cashier, Manager"
-              value={form.position}
-              onChange={(e) => setForm({ ...form, position: e.target.value })}
-            />
-          </Field>*/}
-
-          {/* Color */}
           <Field>
-            <FieldLabel>Color</FieldLabel>
-            <div className="mt-1 flex gap-2">
-              {COLORS.map((color) => (
-                <button
-                  key={color}
-                  type="button"
-                  onClick={() => setForm({ ...form, color })}
-                  className={`h-7 w-7 rounded-full border-2 transition-all ${form.color === color ? "scale-110 border-foreground" : "border-transparent"}`}
-                  style={{ backgroundColor: color }}
-                />
-              ))}
-            </div>
+            <FieldLabel>Предпочтение по сменам</FieldLabel>
+            <Select
+              value={form.shiftPreference}
+              onValueChange={(value) =>
+                setForm((prev) => ({
+                  ...prev,
+                  shiftPreference: value as ShiftPreference,
+                }))
+              }
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {SHIFT_PREFERENCES.map((item) => (
+                  <SelectItem key={item.value} value={item.value}>
+                    {item.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </Field>
 
-          {/* Priority */}
           <Field>
-            <Label htmlFor="priority">Priority</Label>
+            <Label htmlFor="priority">Приоритет (1–10)</Label>
             <Input
               id="priority"
               type="number"
               min={1}
               max={10}
               value={form.priority}
-              onChange={(e) =>
-                setForm({ ...form, priority: Number(e.target.value) })
-              }
+              onChange={(event) => {
+                const parsed = Number(event.target.value)
+                setForm((prev) => ({
+                  ...prev,
+                  priority: Number.isFinite(parsed)
+                    ? Math.min(10, Math.max(1, parsed))
+                    : 1,
+                }))
+              }}
             />
           </Field>
 
-          {/* Shift Preference */}
-          <Field>
-            <FieldLabel>Shift Preference</FieldLabel>
-            <Select
-              value={form.shiftPreference}
-              onValueChange={(val) =>
-                setForm({ ...form, shiftPreference: val as ShiftPreference })
-              }
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="only_day">Only Day</SelectItem>
-                <SelectItem value="only_night">Only Night</SelectItem>
-                <SelectItem value="day">Day</SelectItem>
-                <SelectItem value="night">Night</SelectItem>
-                <SelectItem value="all">All</SelectItem>
-              </SelectContent>
-            </Select>
-          </Field>
-
-          {/* Contract Type */}
-          {/*<Field>
-            <FieldLabel>Contract Type</FieldLabel>
-            <Select
-              value={form.contractType}
-              onValueChange={(val) =>
-                setForm({ ...form, contractType: val as ContractType })
-              }
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="full-time">Full-time</SelectItem>
-                <SelectItem value="part-time">Part-time</SelectItem>
-                <SelectItem value="freelance">Freelance</SelectItem>
-              </SelectContent>
-            </Select>
-          </Field>*/}
-
-          {/* Shifts per month */}
           <div className="grid grid-cols-2 gap-2">
             <Field>
-              <Label htmlFor="minShifts">Min Shifts / Month</Label>
+              <Label htmlFor="minShifts">Минимум смен в месяц</Label>
               <Input
                 id="minShifts"
                 type="number"
                 min={0}
+                max={31}
                 value={form.minShiftsPerMonth}
-                onChange={(e) =>
-                  setForm({
-                    ...form,
-                    minShiftsPerMonth: Number(e.target.value),
-                  })
-                }
+                onChange={(event) => {
+                  const parsed = Number(event.target.value)
+                  setForm((prev) => ({
+                    ...prev,
+                    minShiftsPerMonth: Number.isFinite(parsed)
+                      ? Math.max(0, parsed)
+                      : 0,
+                  }))
+                }}
               />
             </Field>
             <Field>
-              <Label htmlFor="maxShifts">Max Shifts / Month</Label>
+              <Label htmlFor="maxShifts">Максимум смен в месяц</Label>
               <Input
                 id="maxShifts"
                 type="number"
                 min={0}
+                max={31}
                 value={form.maxShiftsPerMonth}
-                onChange={(e) =>
-                  setForm({
-                    ...form,
-                    maxShiftsPerMonth: Number(e.target.value),
-                  })
-                }
+                onChange={(event) => {
+                  const parsed = Number(event.target.value)
+                  setForm((prev) => ({
+                    ...prev,
+                    maxShiftsPerMonth: Number.isFinite(parsed)
+                      ? Math.max(0, parsed)
+                      : 0,
+                  }))
+                }}
               />
             </Field>
           </div>
 
-          {/* Day Selectors */}
-          <DaySelector field="daysOffUsers" label="Days Off" />
+          <Field>
+            <FieldLabel>Выходные дни</FieldLabel>
+            <div className="mt-1 flex flex-wrap gap-1">
+              {Array.from({ length: daysInMonth }).map((_, index) => {
+                const day = index + 1
+                const selected = form.daysOff.includes(day)
+                return (
+                  <button
+                    key={day}
+                    type="button"
+                    aria-pressed={selected}
+                    onClick={() => toggleDay(day)}
+                    className={`h-7 w-7 rounded border text-xs transition-colors ${
+                      selected
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : "border-border bg-background hover:bg-muted"
+                    }`}
+                  >
+                    {day}
+                  </button>
+                )
+              })}
+            </div>
+          </Field>
 
-          {/* Notes */}
-          {/*<Field>
-            <Label htmlFor="notes">Notes</Label>
+          <Field>
+            <Label htmlFor="note">Комментарий</Label>
             <Input
-              id="notes"
-              placeholder="Any special requests..."
-              value={form.notes}
-              onChange={(e) => setForm({ ...form, notes: e.target.value })}
+              id="note"
+              placeholder="Пожелания, ограничения…"
+              value={form.note}
+              onChange={(event) =>
+                setForm((prev) => ({ ...prev, note: event.target.value }))
+              }
             />
-          </Field>*/}
+          </Field>
         </FieldGroup>
 
-        <DialogFooter>
-          <DialogClose asChild>
-            <Button variant="outline">Cancel</Button>
-          </DialogClose>
-          <DialogClose asChild>
-            <Button variant="outline" onClick={handleRemove}>
-              Remove
+        <DialogFooter className="gap-2 sm:justify-between">
+          <div className="flex gap-2">
+            {user.hasMonthOverride && (
+              <Button
+                variant="outline"
+                onClick={handleResetMonth}
+                disabled={isSaving}
+              >
+                Сбросить на {month}
+              </Button>
+            )}
+            <Button
+              variant="ghost"
+              onClick={handleResetBase}
+              disabled={isSaving}
+              title="Вернуть постоянные настройки к значениям по умолчанию"
+            >
+              Сбросить всё
             </Button>
-          </DialogClose>
-          <DialogClose asChild>
-            <Button onClick={handleSave}>Save changes</Button>
-          </DialogClose>
+          </div>
+          <div className="flex gap-2">
+            <DialogClose asChild>
+              <Button variant="outline">Отмена</Button>
+            </DialogClose>
+            <Button onClick={handleSave} disabled={isSaving}>
+              {isSaving ? "Сохранение…" : "Сохранить"}
+            </Button>
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>

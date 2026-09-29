@@ -1,172 +1,129 @@
-'use client'
-import React from "react"
-import { useUsersStore } from "@/store/useUsersStore"
+"use client"
+
+import { useState } from "react"
+import { toast } from "sonner"
 import { Button } from "@workspace/ui/components/button"
-import { CloudUpload, FileDown, Sheet } from "lucide-react"
-import * as XLSX from "xlsx"
+import { FileDown, Save, Sheet } from "lucide-react"
+
+import { handleExcelExport } from "@/futures/handleExcelExport"
+import { ApiError } from "@/lib/api/client"
+import type { ScheduleShift } from "@/lib/api/types"
+import { ScheduleApi } from "@/services/ScheduleApi"
 import { useSettingStore } from "@/store/useSettingStore"
-import dayjs from "dayjs"
-import ExcelJS from "exceljs"
-import { saveAs } from "file-saver"
+import { useUsersStore } from "@/store/useUsersStore"
 
+/**
+ * Действия с готовым графиком.
+ *
+ * Сохранение вынесено в отдельную кнопку, а не выполняется сразу после
+ * генерации: алгоритм недетерминирован, и менеджеру нужно увидеть результат
+ * прежде, чем он попадёт в базу и станет общим для всех.
+ *
+ * Сохранение — полная замена месяца на сервере. Это соответствует смыслу
+ * экрана: то, что видно в таблице, и есть график на этот месяц.
+ */
 const ExportsButtonWrapper = () => {
-  const { users } = useUsersStore()
-  const { currentMonth } = useSettingStore()
+  const users = useUsersStore((state) => state.users)
+  const warehouse = useSettingStore((state) => state.warehouse)
+  const currentMonth = useSettingStore((state) => state.currentMonth)
+  // Норма уходит в файл вместе с графиком: в Excel она подписана рядом с
+  // итогами, иначе красная цифра покрытия ничего не объясняет.
+  const dayCount = useSettingStore((state) => state.dayCount)
+  const nightCount = useSettingStore((state) => state.nightCount)
 
+  const [isSaving, setIsSaving] = useState(false)
 
-  const handleExcelExport = async () => {
-    const daysInMonth = dayjs(currentMonth).daysInMonth()
-    const monthLabel = dayjs(currentMonth).format("MMMM YYYY")
+  const hasSchedule = users.some(
+    (user) => user.dayShifts.length > 0 || user.nightShifts.length > 0
+  )
 
-    const workbook = new ExcelJS.Workbook()
-    const worksheet = workbook.addWorksheet(monthLabel)
+  /**
+   * Черновик графика для сохранения.
+   *
+   * Закреплённые дни помечаются признаком `pinned`: сервер по нему решает, что
+   * можно удалять. Без признака сохранение сняло бы закрепление — вместе с ним
+   * ушла бы и защита ручных правок от следующей генерации.
+   */
+  const buildShifts = (): ScheduleShift[] => {
+    const shift = (
+      user: (typeof users)[number],
+      day: number,
+      shift_type: "day" | "night"
+    ): ScheduleShift => ({
+      subject: user.subject,
+      day,
+      shift_type,
+      pinned: user.pinnedDays.includes(day),
+    })
 
-    const center: Partial<ExcelJS.Alignment> = {
-      horizontal: "center",
-      vertical: "middle",
-    }
-
-    const COLORS = {
-      day: "FFFFA500", // оранжевый
-      night: "FF4A90D9", // синий
-      empty: "FF2D2D2D", // тёмный
-      header: "FF1A1A1A", // заголовок
-      headerText: "FFFFFFFF",
-      nameCol: "FF111111",
-      countRow: "FF1E1E1E",
-    }
-
-    const makeCell = (
-      cell: ExcelJS.Cell,
-      value: string | number,
-      bgColor: string,
-      textColor = "FFFFFFFF",
-      bold = false
-    ) => {
-      cell.value = value
-      cell.alignment = center
-      cell.font = { bold, color: { argb: textColor }, size: 11 }
-      cell.fill = {
-        type: "pattern",
-        pattern: "solid",
-        fgColor: { argb: bgColor },
-      }
-      cell.border = {
-        top: { style: "thin", color: { argb: "FF333333" } },
-        left: { style: "thin", color: { argb: "FF333333" } },
-        bottom: { style: "thin", color: { argb: "FF333333" } },
-        right: { style: "thin", color: { argb: "FF333333" } },
-      }
-    }
-
-    // ── Заголовок ──────────────────────────────────────────────────────
-    const headerRow = worksheet.addRow([
-      "Name",
-      ...Array.from({ length: daysInMonth }, (_, i) => i + 1),
-      "D",
-      "N",
-      "T",
+    return users.flatMap((user) => [
+      ...user.dayShifts.map((day) => shift(user, day, "day")),
+      ...user.nightShifts.map((day) => shift(user, day, "night")),
     ])
-    headerRow.height = 24
-    headerRow.eachCell((cell, col) => {
-      makeCell(
-        cell,
-        cell.value as string | number,
-        COLORS.header,
-        COLORS.headerText,
-        true
+  }
+
+  const handleSave = async () => {
+    if (!warehouse) return
+
+    setIsSaving(true)
+    try {
+      const result = await ScheduleApi.saveShifts(
+        warehouse,
+        currentMonth,
+        buildShifts()
       )
-    })
-
-    // ── Строки пользователей ───────────────────────────────────────────
-    users.forEach((user) => {
-      const rowData: (string | number)[] = [user.fullName]
-
-      for (let day = 1; day <= daysInMonth; day++) {
-        if (user.dayShifts.includes(day)) rowData.push("D")
-        else if (user.nightShifts.includes(day)) rowData.push("N")
-        else rowData.push("—")
+      toast.success(
+        `Сохранено смен: ${result.saved} (${warehouse}, ${currentMonth})` +
+          (result.notified
+            ? `. Уведомления об изменениях отправлены: ${result.notified}`
+            : "")
+      )
+    } catch (cause) {
+      if (cause instanceof ApiError && cause.code === "DUPLICATE_SHIFT") {
+        // Такое возможно только при ручной правке графика: генератор
+        // гарантирует одну смену в день на человека.
+        toast.error("У одного участника две смены в один день")
+      } else if (
+        cause instanceof ApiError &&
+        cause.code === "EMPLOYEE_NOT_IN_WAREHOUSE"
+      ) {
+        toast.error(
+          "В графике есть работники другого склада. Обновите данные склада."
+        )
+      } else {
+        toast.error(
+          cause instanceof ApiError ? cause.message : "Не удалось сохранить график"
+        )
       }
-
-      rowData.push(user.dayShifts.length)
-      rowData.push(user.nightShifts.length)
-      rowData.push(user.dayShifts.length + user.nightShifts.length)
-
-      const row = worksheet.addRow(rowData)
-      row.height = 22
-
-      row.eachCell((cell, colIndex) => {
-        const val = cell.value as string
-
-        if (colIndex === 1) {
-          makeCell(cell, val, COLORS.nameCol, COLORS.headerText, true)
-        } else if (val === "D") {
-          makeCell(cell, "D", COLORS.day, "FF000000")
-        } else if (val === "N") {
-          makeCell(cell, "N", COLORS.night, COLORS.headerText)
-        } else {
-          makeCell(cell, val, COLORS.empty, "FF666666")
-        }
-      })
-    })
-
-    // ── Day / Night count ──────────────────────────────────────────────
-    const buildCountRow = (
-      label: string,
-      getCount: (day: number) => number
-    ) => {
-      const rowData: (string | number)[] = [label]
-      for (let day = 1; day <= daysInMonth; day++) rowData.push(getCount(day))
-      rowData.push("", "", "")
-
-      const row = worksheet.addRow(rowData)
-      row.height = 20
-      row.eachCell((cell, colIndex) => {
-        const bg = label === "Day" ? COLORS.day : COLORS.night
-        const textColor = label === "Day" ? "FF000000" : COLORS.headerText
-        if (colIndex === 1) {
-          makeCell(cell, label, COLORS.countRow, COLORS.headerText, true)
-        } else {
-          makeCell(cell, cell.value as number, bg, textColor)
-        }
-      })
+    } finally {
+      setIsSaving(false)
     }
-
-    buildCountRow(
-      "Day",
-      (day) => users.filter((u) => u.dayShifts.includes(day)).length
-    )
-    buildCountRow(
-      "Night",
-      (day) => users.filter((u) => u.nightShifts.includes(day)).length
-    )
-
-    // ── Ширина колонок ─────────────────────────────────────────────────
-    worksheet.getColumn(1).width = 24
-    for (let i = 2; i <= daysInMonth + 1; i++)
-      worksheet.getColumn(i).width = 4.5
-    worksheet.getColumn(daysInMonth + 2).width = 6
-    worksheet.getColumn(daysInMonth + 3).width = 6
-    worksheet.getColumn(daysInMonth + 4).width = 6
-
-    // ── Скачать ────────────────────────────────────────────────────────
-    const buffer = await workbook.xlsx.writeBuffer()
-    saveAs(new Blob([buffer]), `schedule_${currentMonth}.xlsx`)
   }
 
   return (
-    <div>
-      <Button>
-        <CloudUpload />
-        Save on Server
+    <div className="flex flex-wrap items-center gap-2">
+      <Button
+        onClick={handleSave}
+        disabled={!warehouse || isSaving || !hasSchedule}
+      >
+        <Save />
+        {isSaving ? "Сохранение…" : "Сохранить график"}
       </Button>
-      <Button onClick={handleExcelExport}>
+
+      <Button
+        variant="outline"
+        onClick={() =>
+          handleExcelExport({ users, currentMonth, dayCount, nightCount })
+        }
+        disabled={!users.length}
+      >
         <Sheet />
-        Export Excel
+        Экспорт в Excel
       </Button>
-      <Button>
+
+      <Button variant="outline" disabled title="Появится позже">
         <FileDown />
-        Export PDF
+        Экспорт в PDF
       </Button>
     </div>
   )

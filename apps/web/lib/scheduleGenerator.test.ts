@@ -8,6 +8,7 @@ import {
   type GenerationResult,
   type GeneratorSettings,
 } from "@/lib/scheduleGenerator"
+import { seededRandom } from "@/lib/random"
 import type { IUser } from "@/types/User"
 
 /**
@@ -92,13 +93,21 @@ function totalOf(user: IUser, schedule: Schedule): number {
  * в пользу первого в списке. Из-за этого один прогон ничего не доказывает:
  * свойство нужно проверять на серии, иначе тест проходит и на сломанном коде
  * примерно в половине случаев.
+ *
+ * Зёрна задаются явно. По умолчанию построение детерминировано по входу — так
+ * задумано в приложении, чтобы график не прыгал от нажатия к нажатию, — и без
+ * явных зёрен все прогоны серии совпали бы до последней смены.
  */
 function generateRepeatedly(
   users: IUser[],
   config: GeneratorSettings,
   runs = 15
 ): Schedule[] {
-  return Array.from({ length: runs }, () => generateSchedule(users, config).schedule)
+  return Array.from(
+    { length: runs },
+    (_, run) =>
+      generateSchedule(users, config, { random: seededRandom(run + 1) }).schedule
+  )
 }
 
 describe("смены на других складах", () => {

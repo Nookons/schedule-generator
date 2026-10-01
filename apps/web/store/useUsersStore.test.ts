@@ -46,7 +46,7 @@ function only(): IUser {
 const MARKS: DayMarkKind[] = ["off", "vacation", "sick", "unavailable"]
 
 beforeEach(() => {
-  useUsersStore.setState({ users: [makeUser()] })
+  useUsersStore.setState({ users: [makeUser()], touchedSubjects: [] })
 })
 
 describe("setUserDay", () => {
@@ -152,5 +152,57 @@ describe("applySchedule", () => {
     })
 
     expect(only().marks).toEqual({ 4: "unavailable" })
+  })
+})
+
+/**
+ * Затронутые работники — то, чем пересбор с минимальными правками понимает,
+ * чьи строки замораживать. Ошибка здесь стоит дорого и незаметна: пересбор
+ * просто вернёт человеку смену, которую у него только что убрали, и со стороны
+ * это будет выглядеть как «правка не сохранилась».
+ */
+describe("touchedSubjects", () => {
+  it("запоминает работника, которого правили руками", () => {
+    useUsersStore.getState().setUserDay("e1", 5, "day", true)
+
+    expect(useUsersStore.getState().touchedSubjects).toEqual(["e1"])
+  })
+
+  it("не дублирует одного и того же работника", () => {
+    useUsersStore.setState({ users: [makeUser(), makeUser({ subject: "e2" })] })
+
+    useUsersStore.getState().setUserDay("e1", 5, "day", true)
+    useUsersStore.getState().setUserDay("e1", 6, "night", true)
+    useUsersStore.getState().setUserDay("e2", 7, "day", true)
+
+    expect(useUsersStore.getState().touchedSubjects).toEqual(["e1", "e2"])
+  })
+
+  it("не запоминает переключение закрепления", () => {
+    // «Открепить» означает «пусть алгоритм переставит»: заморозить строку
+    // после этого значило бы сделать открепление бессмысленным.
+    useUsersStore.setState({ users: [makeUser({ dayShifts: [5] })] })
+
+    useUsersStore.getState().setUserPin("e1", 5, false)
+
+    expect(useUsersStore.getState().touchedSubjects).toEqual([])
+  })
+
+  it("снимает заморозку после применения раскладки", () => {
+    useUsersStore.getState().setUserDay("e1", 5, "day", true)
+
+    useUsersStore.getState().applySchedule({
+      e1: { dayShifts: [5], nightShifts: [], pinnedDays: [5] },
+    })
+
+    expect(useUsersStore.getState().touchedSubjects).toEqual([])
+  })
+
+  it("снимает заморозку при загрузке состава", () => {
+    useUsersStore.getState().setUserDay("e1", 5, "day", true)
+
+    useUsersStore.getState().setUsers([makeUser()])
+
+    expect(useUsersStore.getState().touchedSubjects).toEqual([])
   })
 })

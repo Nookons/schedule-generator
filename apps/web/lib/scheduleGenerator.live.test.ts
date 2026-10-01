@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs"
 import { describe, expect, it } from "vitest"
 
 import { toUsers } from "@/lib/employeeMapping"
+import { seededRandom } from "@/lib/random"
 import { generateSchedule } from "@/lib/scheduleGenerator"
 import type { ScheduleParticipant } from "@/lib/api/types"
 
@@ -44,16 +45,23 @@ describe(`реальный склад ${fixture.warehouse}`, () => {
 
   it("не ставит день после ночи — ни своей, ни чужой", () => {
     for (let run = 0; run < 10; run++) {
-      const { schedule } = generateSchedule(users, {
-        dayCount: 2,
-        nightCount: 2,
-        afterNightDayOffs: 1,
-        afterDayDayOffs: 0,
-        daysInMonth,
-        // Снапшот — будущий месяц целиком; заморозка прошедших дней здесь
-        // только сузила бы проверку.
-        frozenThroughDay: 0,
-      })
+      // Зерно на прогон: построение детерминировано по входу, и без явного
+      // зерна все десять прогонов дали бы один и тот же график — серия
+      // перестала бы что-либо проверять.
+      const { schedule } = generateSchedule(
+        users,
+        {
+          dayCount: 2,
+          nightCount: 2,
+          afterNightDayOffs: 1,
+          afterDayDayOffs: 0,
+          daysInMonth,
+          // Снапшот — будущий месяц целиком; заморозка прошедших дней здесь
+          // только сузила бы проверку.
+          frozenThroughDay: 0,
+        },
+        { random: seededRandom(run + 1) }
+      )
 
       for (const user of users) {
         const plan = schedule[user.subject]!
@@ -76,16 +84,23 @@ describe(`реальный склад ${fixture.warehouse}`, () => {
 
   it("не записывает чужие смены в график склада", () => {
     for (let run = 0; run < 5; run++) {
-      const { schedule } = generateSchedule(users, {
-        dayCount: 2,
-        nightCount: 2,
-        afterNightDayOffs: 1,
-        afterDayDayOffs: 0,
-        daysInMonth,
-        // Снапшот — будущий месяц целиком; заморозка прошедших дней здесь
-        // только сузила бы проверку.
-        frozenThroughDay: 0,
-      })
+      // Зерно на прогон: построение детерминировано по входу, и без явного
+      // зерна все десять прогонов дали бы один и тот же график — серия
+      // перестала бы что-либо проверять.
+      const { schedule } = generateSchedule(
+        users,
+        {
+          dayCount: 2,
+          nightCount: 2,
+          afterNightDayOffs: 1,
+          afterDayDayOffs: 0,
+          daysInMonth,
+          // Снапшот — будущий месяц целиком; заморозка прошедших дней здесь
+          // только сузила бы проверку.
+          frozenThroughDay: 0,
+        },
+        { random: seededRandom(run + 1) }
+      )
 
       for (const user of users) {
         const plan = schedule[user.subject]!

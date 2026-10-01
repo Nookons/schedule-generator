@@ -20,6 +20,19 @@ export interface SubjectSchedule {
 
 interface UsersState {
   users: IUser[]
+  /**
+   * Кого менеджер правил руками с последнего построения.
+   *
+   * Нужен пересбору с минимальными правками: строки этих работников он
+   * замораживает целиком, включая пустые дни. Без этого он закрыл бы
+   * освободившийся день тем же, у кого его только что убрали, — то есть отменил
+   * бы правку, ради которой его и позвали. Закреплений для этого мало: убирая
+   * смену, менеджер не оставляет в базе никакого следа.
+   *
+   * Список живёт только в памяти вкладки: после перезагрузки страницы правка уже
+   * лежит в базе как обычная раскладка, и отличить её от работы алгоритма нечем.
+   */
+  touchedSubjects: SubjectKey[]
   /** Заменяет состав целиком: он всегда загружается складом, а не по частям. */
   setUsers: (users: IUser[]) => void
   updateUser: (subject: SubjectKey, data: Partial<IUser>) => void
@@ -109,8 +122,11 @@ function applyDayState(
 
 export const useUsersStore = create<UsersState>((set) => ({
   users: [],
+  touchedSubjects: [],
 
-  setUsers: (users) => set({ users }),
+  // Состав приходит другим складом или месяцем: правки относились к прежним
+  // данным, и переносить их на новые нельзя.
+  setUsers: (users) => set({ users, touchedSubjects: [] }),
 
   updateUser: (subject, data) =>
     set((state) => ({
@@ -119,6 +135,9 @@ export const useUsersStore = create<UsersState>((set) => ({
       ),
     })),
 
+  // Раскладка только что пересобрана целиком — ручных правок в ней больше нет.
+  // Это же снимает заморозку после пересбора с минимальными правками: он уже
+  // учёл их, и повторный запуск ничего не чинит.
   applySchedule: (schedule) =>
     set((state) => ({
       users: state.users.map((u) => {
@@ -133,6 +152,7 @@ export const useUsersStore = create<UsersState>((set) => ({
           pinnedDays: [...shifts.pinnedDays].sort((a, b) => a - b),
         }
       }),
+      touchedSubjects: [],
     })),
 
   setUserDay: (subject, day, dayState, pinned) =>
@@ -140,6 +160,13 @@ export const useUsersStore = create<UsersState>((set) => ({
       users: state.users.map((u) =>
         u.subject === subject ? applyDayState(u, day, dayState, pinned) : u
       ),
+      // Заморозка — свойство строки, а не дня: менеджер правил этого человека,
+      // и следующий пересбор не должен трогать у него ничего, включая пустые
+      // дни. Закрепление сюда не попадает намеренно: «открепить» как раз и
+      // означает «пусть алгоритм переставит».
+      touchedSubjects: state.touchedSubjects.includes(subject)
+        ? state.touchedSubjects
+        : [...state.touchedSubjects, subject],
     })),
 
   setUserPin: (subject, day, pinned) =>
@@ -152,5 +179,5 @@ export const useUsersStore = create<UsersState>((set) => ({
       }),
     })),
 
-  reset: () => set({ users: [] }),
+  reset: () => set({ users: [], touchedSubjects: [] }),
 }))
